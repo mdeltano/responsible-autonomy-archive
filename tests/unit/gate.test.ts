@@ -39,7 +39,6 @@ const state: GateState = {
   payment,
   priorOperations: [],
   now: Date.parse("2026-10-13T12:00:00Z"),
-  approvalPathAvailable: true,
 };
 
 const refund = (amountMinor: number, extra: Partial<{ currency: string; reason: string; orderId: string }> = {}): GateAction => ({
@@ -73,13 +72,6 @@ describe("gate decisions (spec Step 4)", () => {
     expect(result.decision).toBe("REFUSE");
     expect(result.ruleIds).toEqual(["SUPPORTED_CURRENCY"]);
     expect(result.explanation).toMatch(/supports refunds in USD only, not EUR/);
-  });
-
-  it("refuses when approval is needed but no trusted approval path exists, and offers the alternative", () => {
-    const result = evaluate(refund(12000), { approvalPathAvailable: false });
-    expect(result.decision).toBe("REFUSE");
-    expect(result.ruleIds).toEqual(["APPROVAL_PATH"]);
-    expect(result.explanation).toMatch(/at most 5000 minor units can execute automatically/);
   });
 
   it.each([

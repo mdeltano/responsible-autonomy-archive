@@ -36,8 +36,11 @@ const envSchema = z.object({
   MAX_QUESTIONS: nonNegativeInt(3),
   MAX_PROVIDER_RETRIES: nonNegativeInt(2),
   ACTIVE_TIMEOUT_MS: positiveInt(120_000),
+  // How long a task waits for a clarification answer.
   PENDING_TASK_TTL_MS: positiveInt(24 * 60 * 60 * 1000),
-  APPROVAL_TTL_MS: positiveInt(5 * 60 * 1000),
+  // How long an approval waits for an assigned approver before expiring. Deliberately longer than the
+  // spec's 5-minute default; see DECISIONS.md "Approvals wait for an assigned approver".
+  APPROVAL_TTL_MS: positiveInt(7 * 24 * 60 * 60 * 1000),
   MAX_ACTIVE_TASKS: positiveInt(2),
   MAX_QUEUED_TASKS: positiveInt(10),
   RETENTION_DAYS: positiveInt(7),
@@ -92,11 +95,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     if (e.MAX_TOKENS_PER_TASK === undefined) {
       throw new ConfigError("MAX_TOKENS_PER_TASK must be a positive integer before provider calls are enabled");
     }
-  }
-
-  if (e.APPROVAL_TTL_MS > e.PENDING_TASK_TTL_MS) {
-    // Spec §Reliability: approvals expire sooner than pending tasks.
-    throw new ConfigError("APPROVAL_TTL_MS must not exceed PENDING_TASK_TTL_MS");
   }
 
   return {

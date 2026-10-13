@@ -36,7 +36,6 @@ export const RULE_IDS = [
   "ORIGINAL_DESTINATION",
   "FRESH_STATE",
   "APPROVAL_THRESHOLD",
-  "APPROVAL_PATH",
 ] as const;
 export type RuleId = (typeof RULE_IDS)[number];
 
@@ -79,8 +78,6 @@ export interface GateState {
   payment: GatePayment | null;
   priorOperations: readonly PriorOperation[];
   now: number;
-  // Whether a trusted operator holding the approver role can act on approvals in this deployment.
-  approvalPathAvailable: boolean;
 }
 
 export type RuleOutcome = "pass" | "fail" | "unresolved";
@@ -285,16 +282,13 @@ export function evaluateAction(
   const threshold = policy.currencies[args.currency]?.autoExecuteMaxMinor;
   if (threshold === undefined) throw new Error("Unsupported currency passed the prohibition phase");
   if (args.amountMinor > threshold) {
-    const why = `Refunds above ${threshold} ${args.currency} minor units require approval under policy ${policy.version}.`;
-    if (!state.approvalPathAvailable) {
-      const path = check(
-        "APPROVAL_PATH",
-        "fail",
-        `${why} No trusted approval path is configured. A refund of at most ${threshold} minor units can execute automatically.`,
-      );
-      return result("REFUSE", [path], checks, preconditions, versions);
-    }
-    const approval = check("APPROVAL_THRESHOLD", "fail", `${why} Approver role: ${policy.approverRole}.`);
+    // Whether anyone currently holds the role does not matter here: the task waits for an assigned
+    // approver until the approval expires (see DECISIONS.md, "Approvals wait for an assigned approver").
+    const approval = check(
+      "APPROVAL_THRESHOLD",
+      "fail",
+      `Refunds above ${threshold} ${args.currency} minor units require approval by ${policy.approverRole} under policy ${policy.version}.`,
+    );
     return result("HUMAN_APPROVAL", [approval], checks, preconditions, versions, policy.approverRole);
   }
   const auto = check("APPROVAL_THRESHOLD", "pass", `The amount is within the automatic threshold of ${threshold}.`);

@@ -18,7 +18,7 @@ describe("loadConfig", () => {
       maxProviderRetries: 2,
       activeTimeoutMs: 120_000,
       pendingTaskTtlMs: 86_400_000,
-      approvalTtlMs: 300_000,
+      approvalTtlMs: 604_800_000,
       maxActiveTasks: 2,
       maxQueuedTasks: 10,
       retentionDays: 7,
@@ -49,8 +49,8 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ MAX_TOOL_CALLS: "lots" })).toThrow(/MAX_TOOL_CALLS/);
   });
 
-  it("requires approvals to expire no later than pending tasks", () => {
-    expect(() => loadConfig({ APPROVAL_TTL_MS: "100000", PENDING_TASK_TTL_MS: "50000" })).toThrow(ConfigError);
+  it("lets approvals wait longer than clarification answers", () => {
+    expect(loadConfig({ APPROVAL_TTL_MS: "604800000", PENDING_TASK_TTL_MS: "86400000" }).approvalTtlMs).toBe(604_800_000);
   });
 
   it("never exposes a credential while the fake provider is selected", () => {
