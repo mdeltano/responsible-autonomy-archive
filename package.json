@@ -1,0 +1,32 @@
+{
+  "name": "responsible-autonomy",
+  "version": "0.1.0",
+  "description": "Responsible Autonomy: a tool-using customer-service agent that executes only actions passing a deterministic policy and execution gate.",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "bin": {
+    "responsible-autonomy": "dist/cli/main.js"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:integration": "vitest run tests/integration --passWithNoTests",
+    "test:watch": "vitest",
+    "evaluate": "tsx src/cli/main.ts evaluate",
+    "demo": "tsx src/cli/main.ts demo"
+  },
+  "dependencies": {
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "25.9.9",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11"
+  }
+}
