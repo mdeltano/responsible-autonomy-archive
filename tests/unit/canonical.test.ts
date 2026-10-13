@@ -10,7 +10,7 @@ import {
   type Approval,
   type TaskSummary,
 } from "../../src/contracts/canonical.js";
-import { canonicalSchemas, toJsonSchema } from "../../src/contracts/json-schema.js";
+import { contractSchemas, toJsonSchema } from "../../src/contracts/json-schema.js";
 
 const NOW = "2026-10-13T12:00:00Z";
 const DIGEST = "a".repeat(64);
@@ -219,7 +219,7 @@ describe("TaskSummary", () => {
 
 describe("JSON Schema export", () => {
   it("emits a schema for every canonical contract", () => {
-    for (const name of Object.keys(canonicalSchemas) as (keyof typeof canonicalSchemas)[]) {
+    for (const name of Object.keys(contractSchemas) as (keyof typeof contractSchemas)[]) {
       expect(toJsonSchema(name)).toHaveProperty("$schema");
     }
   });
