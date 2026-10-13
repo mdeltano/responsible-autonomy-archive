@@ -29,6 +29,7 @@ export const RULE_IDS = [
   "ORDER_SCOPE",
   "POSITIVE_AMOUNT",
   "ORDER_CURRENCY",
+  "SUPPORTED_CURRENCY",
   "DUPLICATE_OPERATION",
   "ELIGIBLE_ORDER",
   "AVAILABLE_BALANCE",
@@ -227,6 +228,17 @@ export function evaluateAction(
   if (args.currency !== order.currency) {
     prohibited.push(check("ORDER_CURRENCY", "fail", `The refund must use the order currency ${order.currency}.`));
   }
+  // Only currencies the policy configures are supported; there is no conversion to a configured one.
+  const supported = Object.keys(policy.currencies);
+  if (!supported.includes(order.currency)) {
+    prohibited.push(
+      check(
+        "SUPPORTED_CURRENCY",
+        "fail",
+        `Policy ${policy.version} supports refunds in ${supported.join(", ")} only, not ${order.currency}.`,
+      ),
+    );
+  }
   if (alreadyDone) {
     prohibited.push(check("DUPLICATE_OPERATION", "fail", "This task already refunded this order; it will not be repeated."));
   }
@@ -269,17 +281,17 @@ export function evaluateAction(
   check("AVAILABLE_BALANCE", "pass", "The amount is within the remaining refundable balance.");
   check("ORIGINAL_DESTINATION", "pass", "The refund goes to the original payment destination.");
 
-  // 4. Approval requirements. A currency without a configured threshold never executes automatically.
+  // 4. Approval requirements. The currency is supported here, so its threshold is configured.
   const threshold = policy.currencies[args.currency]?.autoExecuteMaxMinor;
-  if (threshold === undefined || args.amountMinor > threshold) {
-    const why =
-      threshold === undefined
-        ? `Policy ${policy.version} sets no automatic threshold for ${args.currency}.`
-        : `Refunds above ${threshold} ${args.currency} minor units require approval under policy ${policy.version}.`;
+  if (threshold === undefined) throw new Error("Unsupported currency passed the prohibition phase");
+  if (args.amountMinor > threshold) {
+    const why = `Refunds above ${threshold} ${args.currency} minor units require approval under policy ${policy.version}.`;
     if (!state.approvalPathAvailable) {
-      const alternative =
-        threshold === undefined ? "" : ` A refund of at most ${threshold} minor units can execute automatically.`;
-      const path = check("APPROVAL_PATH", "fail", `${why} No trusted approval path is configured.${alternative}`);
+      const path = check(
+        "APPROVAL_PATH",
+        "fail",
+        `${why} No trusted approval path is configured. A refund of at most ${threshold} minor units can execute automatically.`,
+      );
       return result("REFUSE", [path], checks, preconditions, versions);
     }
     const approval = check("APPROVAL_THRESHOLD", "fail", `${why} Approver role: ${policy.approverRole}.`);

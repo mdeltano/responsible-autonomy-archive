@@ -67,11 +67,12 @@ describe("gate decisions (spec Step 4)", () => {
     expect(result.requiredRole).toBe("refund_approver");
   });
 
-  it("requires approval in a currency without a configured threshold, without converting", () => {
+  it("refuses currencies the policy does not support, without converting", () => {
     const eur = { ...order, currency: "EUR" };
     const result = evaluate(refund(1, { currency: "EUR" }), { order: eur, payment: { ...payment, currency: "EUR" } });
-    expect(result.decision).toBe("HUMAN_APPROVAL");
-    expect(result.explanation).toMatch(/no automatic threshold for EUR/);
+    expect(result.decision).toBe("REFUSE");
+    expect(result.ruleIds).toEqual(["SUPPORTED_CURRENCY"]);
+    expect(result.explanation).toMatch(/supports refunds in USD only, not EUR/);
   });
 
   it("refuses when approval is needed but no trusted approval path exists, and offers the alternative", () => {
