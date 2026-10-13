@@ -3,6 +3,30 @@
 Record tooling choices the spec leaves open, and any deliberate deviation from [SPEC.md](SPEC.md),
 newest first. Each entry: date, decision, spec section affected, reason.
 
+## 2026-10-13 — Completion checks for `finish` (target for Step 6)
+
+The spec accepts `finish` "only after application-side completion checks confirm the outcome" but does
+not list the checks. The owner chose the following definition. The coordinator marks a task
+`completed` only when all of these hold, judged from records and never from model text:
+
+1. An accepted `propose_resolution` exists for an order inside the task's trusted scope.
+2. The resolution is backed by facts:
+   - **refund:** the exact proposal was committed, and `verify_refund` confirmed the ledger
+     (`verified: true`, amount and currency match the proposal).
+   - **no_refund:** the deterministic eligibility check reports the order ineligible, or the ledger
+     shows the refund already completed.
+3. No unanswered question, pending approval, or operation with an unknown acknowledgment remains.
+4. No action outside the case was taken (R14).
+5. `record_resolution` stored an outcome note for the order. Spec §Version 1 scope lists "record an
+   outcome" as a required action.
+
+If any check fails while budget remains, the finish is rejected, the planner is told which checks are
+unmet, and the loop continues. Otherwise the terminal status is `refused` (policy blocks the goal and no
+permitted alternative exists), `partial` (useful work but goal unfinished, including budget exhaustion,
+timeout, and expired waits), `failed` (no useful work or an unrecoverable error), or `cancelled`
+(operator stop; any committed refund is still reported with its verified outcome). The model never
+supplies the status. Spec Step 6, §Reliability and limits.
+
 ## 2026-10-13 — Step 2 service inputs and planner contract
 
 - **Planner output variants:** the spec lists `tool_call`, `ask_question`, `propose_resolution`, and
