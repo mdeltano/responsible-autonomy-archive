@@ -1,0 +1,7 @@
+{
+  "version": "refund-policy.v1",
+  "approverRole": "refund_approver",
+  "currencies": {
+    "USD": { "autoExecuteMaxMinor": 5000 }
+  }
+}
