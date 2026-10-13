@@ -3,6 +3,27 @@
 Record tooling choices the spec leaves open, and any deliberate deviation from [SPEC.md](SPEC.md),
 newest first. Each entry: date, decision, spec section affected, reason.
 
+## 2026-10-13 — Step 2 canonical contracts
+
+- **Tool-specific proposal arguments:** `ActionProposal` is a discriminated union on `tool`.
+  `commit_refund` carries `{orderId, amountMinor, currency, reason}` (the refund that `propose_refund`
+  requested), and `record_resolution` carries `{orderId, note}`. Neither has a destination field, so
+  refunds can only go to the original payment. Spec §Canonical contracts, Step 2.
+- **Cross-field invariants beyond the spec's types**, enforced by zod at runtime (JSON Schema cannot
+  express them):
+  - `targetId` must equal `arguments.orderId`.
+  - `AUTO_EXECUTE` and `HUMAN_APPROVAL` require every precondition to be `satisfied`.
+  - Record evidence must carry a `recordVersion`.
+  - `approverId` is set exactly when an approval is `approved` or `denied`.
+  - A question is tied to at least one missing precondition.
+  - `TaskSummary`: a result is present exactly for terminal statuses, and `completed` requires
+    `verified: true`. The waiting statuses pair with an unanswered question or a pending approval.
+    `updatedAt` must not precede `createdAt`.
+
+  Spec §Product behavior, §Policy rules, §Definition of done.
+- **Size caps where the spec gives none:** `stateVersions` holds at most 20 entries, `stage` is 1–64
+  characters, and question options are 1–200 characters each.
+
 ## 2026-10-13 — Step 2 contract primitives
 
 - **Opaque ID character set:** the spec requires IDs to be opaque strings of 1–128 characters. IDs and
