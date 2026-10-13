@@ -11,7 +11,7 @@ Status values: `todo`, `in progress`, `done`, `deferred` (with reason).
 | 1 Repository and development environment | 1 | done | 2026-10-12. Typecheck and tests pass, and invalid config fails with a message naming the variable. No provider call needed. |
 | 2 Contracts and trusted task context | 1 | done | 2026-10-13. Strict contracts, typed errors, CallerContext and scope checks, policy file, deterministic eligibility. 96 unit tests. Service-level ordering ("before model calls or writes") is exercised again end to end in Steps 5–7. |
 | 3 Storage and synthetic execution model | 1 | done | 2026-10-13. Migrations, isolated scenario instances, two public fixtures, atomic refund commit, verification, fault injection. Integration test commits once, rejects over-refund, and reconciles a lost acknowledgment without repeating it. |
-| 4 Deterministic gate | 1 | todo | Policy tests cover all four decisions. Prompt text and confidence cannot change a verdict. |
+| 4 Deterministic gate | 1 | done | 2026-10-13. `evaluateAction` covers all four decisions with stable rule IDs in a fixed order. Tests show that reasons, notes, confidence, and model-authored preconditions cannot change a verdict. Canonical JSON and `actionDigest` are tested for key order and for changed amount, target, and version. |
 | 5 Approvals and atomic execution | 1 | todo | R03, R07, R08, R09 pass with a fake planner. |
 | 6 Coordinator with fake planner | 2 | todo | Scripted planners complete, pause/resume, stop at limits, and cancel without duplicate effects. |
 | 7 Local demonstration interface (CLI) | 2 | todo | R01 end to end. |

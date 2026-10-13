@@ -3,6 +3,39 @@
 Record tooling choices the spec leaves open, and any deliberate deviation from [SPEC.md](SPEC.md),
 newest first. Each entry: date, decision, spec section affected, reason.
 
+## 2026-10-13 — Step 4 deterministic gate
+
+- **Signature:** `evaluateAction(context, action, state, policy)` is a pure function with no I/O. The
+  application reads `GateState` (order, payment, this task's prior operations on the order, synthetic
+  now, approval-path availability) from trusted records. The strict `gateAction` schema has no field for
+  a rationale, confidence, preconditions, a decision, or a destination. Spec Step 4.
+- **Rule order:** (1) `ORDER_SCOPE`; (2) prohibitions on known facts: `POSITIVE_AMOUNT`,
+  `ORDER_CURRENCY`, `DUPLICATE_OPERATION` (already done), `ELIGIBLE_ORDER` (ineligible),
+  `AVAILABLE_BALANCE`; (3) unresolved facts: `ORIGINAL_DESTINATION` (no payment record),
+  `ELIGIBLE_ORDER` (unknown), `DUPLICATE_OPERATION` (unknown prior outcome), `FRESH_STATE`;
+  (4) `APPROVAL_THRESHOLD` / `APPROVAL_PATH`; then allowed. Every failing rule in the deciding phase is
+  reported. `ORDER_CURRENCY` and `APPROVAL_PATH` extend the spec's "such as" list.
+- **Scope refusal reveals nothing:** unknown orders, out-of-scope orders, and arguments naming a
+  different order all produce the identical REFUSE result, with no preconditions or versions. Spec
+  §Security and privacy.
+- **Unconfigured currency:** a currency absent from the policy has no automatic threshold, so every
+  refund in it needs HUMAN_APPROVAL. Nothing is converted. Spec §Policy rules.
+- **No approval path:** when approval is required but `approvalPathAvailable` is false (no trusted
+  operator holds the approver role), the decision is REFUSE under `APPROVAL_PATH`. The explanation names
+  the permitted alternative: a refund within the automatic threshold. Spec §Policy rules ("approval is
+  offered only when the application has a trusted authorized approval path"), §Product behavior.
+- **Preconditions describe knowledge, not outcomes:** a precondition is `satisfied` when the fact is
+  established from records, whether it passes or fails. A known disqualifying fact is reported as a rule
+  failure (REFUSE), not as a missing precondition. This keeps gate output valid against the
+  ActionProposal contract for all four decisions.
+- **Duplicates are per task and order:** a committed or verified refund (or note) by the same task on the
+  same order refuses another. An attempt with an unknown outcome requires reconciliation first (R14,
+  R08). Refunds by other tasks are bounded by `AVAILABLE_BALANCE`.
+- **Digest scope:** `actionDigest` covers tool, arguments, target, `{ownerId, scope}` as the caller
+  scope, policy version, and state versions. The actor is excluded, so a different trusted operator can
+  approve the same action. Canonical JSON sorts keys, keeps array order, and rejects `undefined`, NaN,
+  BigInt, and non-plain objects.
+
 ## 2026-10-13 — Step 3 storage and synthetic execution model
 
 - **SQLite setup:** `node:sqlite` with STRICT tables, foreign keys on, and WAL for file databases.
