@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { currencyCode, opaqueId, roleName } from "./contracts/primitives.js";
 
 // Runtime configuration (spec Step 1, §Reliability and limits, §Security and privacy). Every setting is
 // validated at startup; the application refuses to start on missing credentials or unsupported values.
@@ -11,9 +12,6 @@ const positiveInt = (fallback: number) =>
 const nonNegativeInt = (fallback: number) =>
   z.preprocess(emptyToUndefined, z.coerce.number().int().nonnegative().default(fallback));
 
-const opaqueId = z.string().min(1).max(128);
-const roleName = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
-
 const envSchema = z.object({
   // Real provider adapters arrive in Step 8; until then only the offline fake planner is accepted.
   MODEL_PROVIDER: z.preprocess(emptyToUndefined, z.enum(["fake"]).default("fake")),
@@ -23,7 +21,7 @@ const envSchema = z.object({
   MAX_TOKENS_PER_TASK: z.preprocess(emptyToUndefined, z.coerce.number().int().positive().optional()),
   EVALUATION_ENABLED: z.preprocess(emptyToUndefined, z.stringbool().default(false)),
   POLICY_PATH: z.preprocess(emptyToUndefined, z.string().min(1).default("./policies/refund-policy.v1.json")),
-  CURRENCY: z.preprocess(emptyToUndefined, z.string().regex(/^[A-Z]{3}$/).default("USD")),
+  CURRENCY: z.preprocess(emptyToUndefined, currencyCode.default("USD")),
   // Local single-owner demo identity (spec §Policy rules, Step 2): a documented demo assumption,
   // not authentication. Never populated from task input.
   LOCAL_OWNER_ID: z.preprocess(emptyToUndefined, opaqueId.default("local-owner")),
