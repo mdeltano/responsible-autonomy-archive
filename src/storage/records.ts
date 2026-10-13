@@ -1,4 +1,3 @@
-import type { EligibilityFacts } from "../domain/eligibility.js";
 import type { Database } from "./database.js";
 import { int, jsonOrNull, text, textOrNull } from "./rows.js";
 
@@ -75,17 +74,5 @@ export function readPaymentForOrder(db: Database, instanceId: string, orderId: s
     fixtureRefundedMinor: int(row, "fixture_refunded_minor"),
     refundedMinor: int(row, "refunded_minor"),
     version: int(row, "version"),
-  };
-}
-
-// Eligibility facts for one order, straight from records (spec Step 2). A missing payment record
-// leaves the amounts unknown rather than assuming zero.
-export function eligibilityFactsFor(order: OrderRecord, payment: PaymentRecord | null): EligibilityFacts {
-  return {
-    paymentStatus: order.paymentStatus,
-    refundWindow: order.refundWindow,
-    exclusions: order.exclusions,
-    paidAmount: payment && { amountMinor: payment.paidMinor, currency: payment.currency },
-    refundedAmount: payment && { amountMinor: payment.refundedMinor, currency: payment.currency },
   };
 }

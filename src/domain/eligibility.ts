@@ -86,3 +86,27 @@ export function evaluateEligibility(input: EligibilityFacts, now: number): Eligi
       : "unknown";
   return { status, checks, remainingRefundable: balance.remaining };
 }
+
+// Minimal record shapes the domain needs; storage records satisfy them structurally.
+export interface OrderFacts {
+  paymentStatus: "paid" | "unpaid" | "voided" | null;
+  refundWindow: { startsAt: string; days: number } | null;
+  exclusions: string[] | null;
+}
+export interface PaymentFacts {
+  currency: string;
+  paidMinor: number;
+  refundedMinor: number;
+}
+
+// Eligibility facts straight from records. A missing payment record leaves the amounts unknown
+// rather than assuming zero.
+export function factsFromRecords(order: OrderFacts, payment: PaymentFacts | null): EligibilityFacts {
+  return {
+    paymentStatus: order.paymentStatus,
+    refundWindow: order.refundWindow,
+    exclusions: order.exclusions,
+    paidAmount: payment && { amountMinor: payment.paidMinor, currency: payment.currency },
+    refundedAmount: payment && { amountMinor: payment.refundedMinor, currency: payment.currency },
+  };
+}

@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { scenarioFixture } from "../../src/contracts/scenario.js";
 import { AppError } from "../../src/contracts/errors.js";
 import { ManualClock } from "../../src/domain/clock.js";
-import { evaluateEligibility } from "../../src/domain/eligibility.js";
+import { evaluateEligibility, factsFromRecords } from "../../src/domain/eligibility.js";
 import { migrate, openDatabase, transaction } from "../../src/storage/database.js";
 import { getScenarioInstance, instanceClock } from "../../src/storage/instances.js";
 import { readProposal } from "../../src/storage/proposals.js";
-import { eligibilityFactsFor, readOrder, readPaymentForOrder } from "../../src/storage/records.js";
+import { readOrder, readPaymentForOrder } from "../../src/storage/records.js";
 import { getTask } from "../../src/storage/tasks.js";
 import { appendAuditEvent, listAuditEvents } from "../../src/storage/audit.js";
 import { fixture, fixtures, setupScenario } from "../helpers/scenario.js";
@@ -68,9 +68,9 @@ describe("scenario instances", () => {
     const { db, instance } = setupScenario();
     const order = readOrder(db, instance.id, "O-100");
     if (!order) throw new Error("missing order");
-    const facts = eligibilityFactsFor(order, readPaymentForOrder(db, instance.id, "O-100"));
+    const facts = factsFromRecords(order, readPaymentForOrder(db, instance.id, "O-100"));
     expect(evaluateEligibility(facts, Date.parse("2026-10-13T12:00:00Z")).status).toBe("eligible");
-    expect(evaluateEligibility(eligibilityFactsFor(order, null), Date.parse("2026-10-13T12:00:00Z")).status).toBe(
+    expect(evaluateEligibility(factsFromRecords(order, null), Date.parse("2026-10-13T12:00:00Z")).status).toBe(
       "unknown",
     );
   });
