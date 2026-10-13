@@ -3,6 +3,31 @@
 Record tooling choices the spec leaves open, and any deliberate deviation from [SPEC.md](SPEC.md),
 newest first. Each entry: date, decision, spec section affected, reason.
 
+## 2026-10-13 — Approvals wait for an assigned approver
+
+- **Decision (owner):** when a refund needs approval, the task waits for an operator holding the
+  approver role instead of being refused because nobody holds it right now. If no approver acts within
+  `APPROVAL_TTL_MS` (default 7 days), the approval expires.
+- **Gate:** the `APPROVAL_PATH` rule and `GateState.approvalPathAvailable` are removed. Above the
+  threshold the gate always returns HUMAN_APPROVAL. Roles are re-read from configuration on every call
+  (`contextForCall`), so an approver assigned during the wait can act. The approval itself must still
+  come from explicit operator input with the required role.
+- **Expiry is not denial:** an expired approval gets status `expired`, and the task ends `partial` with
+  an explicit reason ("approval not received within 7 days"), never `refused` or `completed`. Expiry is
+  evaluated lazily against the stored `expiresAt` and the injected clock, so no timer has to run for a
+  week. Implemented in Steps 5–6. Spec §Reliability and limits ("expired waiting tasks become partial
+  or failed with an explicit reason").
+- **Deviation from spec defaults:** the spec defaults approvals to 5 minutes and pending tasks to 24 hours
+  ("approvals sooner"). Here `APPROVAL_TTL_MS` defaults to 7 days, `PENDING_TASK_TTL_MS` (24 hours) now
+  governs only clarification waits, and the config check "approval TTL must not exceed pending TTL" was
+  removed. The risk of a long wait is a stale approval. It is contained because the approval binds to
+  record versions through `actionDigest`, and because the gate re-runs inside the commit transaction:
+  if the refund window closes or the balance changes during the wait, the old approval cannot be used.
+- **Waiting costs nothing:** a waiting task holds no worker slot and does not consume the active
+  execution clock. Spec Step 6.
+- **Retention:** `RETENTION_DAYS` counts from when a task reaches a terminal status, so a task cannot be
+  purged while it waits for approval.
+
 ## 2026-10-13 — Version 1 is USD-only
 
 - **Decision:** version 1 supports refunds in USD only. The policy configures a threshold only for USD,
@@ -30,14 +55,15 @@ newest first. Each entry: date, decision, spec section affected, reason.
   `ORDER_CURRENCY`, `DUPLICATE_OPERATION` (already done), `ELIGIBLE_ORDER` (ineligible),
   `AVAILABLE_BALANCE`; (3) unresolved facts: `ORIGINAL_DESTINATION` (no payment record),
   `ELIGIBLE_ORDER` (unknown), `DUPLICATE_OPERATION` (unknown prior outcome), `FRESH_STATE`;
-  (4) `APPROVAL_THRESHOLD` / `APPROVAL_PATH`; then allowed. Every failing rule in the deciding phase is
-  reported. `ORDER_CURRENCY` and `APPROVAL_PATH` extend the spec's "such as" list.
+  (4) `APPROVAL_THRESHOLD`; then allowed. Every failing rule in the deciding phase is reported.
+  `ORDER_CURRENCY` and `SUPPORTED_CURRENCY` extend the spec's "such as" list. (`APPROVAL_PATH` was
+  removed; see "Approvals wait for an assigned approver".)
 - **Scope refusal reveals nothing:** unknown orders, out-of-scope orders, and arguments naming a
   different order all produce the identical REFUSE result, with no preconditions or versions. Spec
   §Security and privacy.
 - **Unconfigured currency:** ~~a currency absent from the policy needs HUMAN_APPROVAL~~. Superseded by
   "Version 1 is USD-only" below: such a currency is now refused.
-- **No approval path:** when approval is required but `approvalPathAvailable` is false (no trusted
+- **No approval path (superseded by "Approvals wait for an assigned approver"):** when approval is required but `approvalPathAvailable` is false (no trusted
   operator holds the approver role), the decision is REFUSE under `APPROVAL_PATH`. The explanation names
   the permitted alternative: a refund within the automatic threshold. Spec §Policy rules ("approval is
   offered only when the application has a trusted authorized approval path"), §Product behavior.

@@ -61,8 +61,9 @@ must not import from `src/cli`. Business rules live in services and the domain, 
   ledger, and write the audit event in one transaction. After a lost acknowledgment, look up the existing
   operation instead of repeating the write.
 - **Approvals bind to actionDigest**, which is SHA-256 of canonical JSON over tool, args, target, caller
-  scope, policy version, and state versions. They expire (default 5 min) and are invalidated by relevant
-  changes. Only explicit operator input through the interface can approve. The planner never gets an
+  scope, policy version, and state versions. A pending approval waits for an assigned approver and
+  expires after `APPROVAL_TTL_MS` (default 7 days, a recorded deviation from the spec's 5 minutes).
+  Expiry is not a denial. Approvals are invalidated by relevant changes. Only explicit operator input through the interface can approve. The planner never gets an
   approval tool.
 - **Trusted context is never derived from text.** CallerContext comes from config, not from goals,
   answers, or record notes. All of those are untrusted data that cannot expand scope or override policy.
