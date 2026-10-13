@@ -3,6 +3,23 @@
 Record tooling choices the spec leaves open, and any deliberate deviation from [SPEC.md](SPEC.md),
 newest first. Each entry: date, decision, spec section affected, reason.
 
+## 2026-10-13 — Version 1 is USD-only
+
+- **Decision:** version 1 supports refunds in USD only. The policy configures a threshold only for USD,
+  and the gate REFUSEs any order in a currency the policy does not configure, under the new rule
+  `SUPPORTED_CURRENCY` in the prohibition phase. This replaces the earlier behavior of sending
+  unconfigured currencies to HUMAN_APPROVAL.
+- **Why not peg other currencies to 5000 USD:** a USD-equivalent threshold is an inferred conversion,
+  which the spec forbids ("do not infer conversions"; other currencies need "explicit configured
+  thresholds"). Live exchange rates would make the gate depend on the network and on time, so it would
+  no longer be deterministic, and they would add network calls to tests. Fixed per-currency figures would
+  be configuration that drifts from any USD benchmark, and currencies differ in minor-unit exponents
+  (JPY 0, KWD 3). Every scenario is USD, so none of this would earn its cost.
+- **Extensible later:** `RefundPolicy.currencies` stays a map. Adding a currency means a new policy
+  version with an explicit threshold for it, with no code change and no conversion. The application
+  wiring (Step 7) should also check at startup that `CURRENCY` is configured in the loaded policy.
+  Spec §Policy rules, §Version 1 scope.
+
 ## 2026-10-13 — Step 4 deterministic gate
 
 - **Signature:** `evaluateAction(context, action, state, policy)` is a pure function with no I/O. The
@@ -18,8 +35,8 @@ newest first. Each entry: date, decision, spec section affected, reason.
 - **Scope refusal reveals nothing:** unknown orders, out-of-scope orders, and arguments naming a
   different order all produce the identical REFUSE result, with no preconditions or versions. Spec
   §Security and privacy.
-- **Unconfigured currency:** a currency absent from the policy has no automatic threshold, so every
-  refund in it needs HUMAN_APPROVAL. Nothing is converted. Spec §Policy rules.
+- **Unconfigured currency:** ~~a currency absent from the policy needs HUMAN_APPROVAL~~. Superseded by
+  "Version 1 is USD-only" below: such a currency is now refused.
 - **No approval path:** when approval is required but `approvalPathAvailable` is false (no trusted
   operator holds the approver role), the decision is REFUSE under `APPROVAL_PATH`. The explanation names
   the permitted alternative: a refund within the automatic threshold. Spec §Policy rules ("approval is
