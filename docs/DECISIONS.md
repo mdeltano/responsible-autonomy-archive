@@ -3,6 +3,33 @@
 Record tooling choices the spec leaves open, and any deliberate deviation from [SPEC.md](SPEC.md),
 newest first. Each entry: date, decision, spec section affected, reason.
 
+## 2026-10-13 — Step 2 clock, policy, and eligibility
+
+- **Clock:** `Clock.now()` returns epoch milliseconds. `systemClock` is used in production, and
+  `ManualClock` (forward-only `advance`) is used in tests and demos. Eligibility takes `now` explicitly, so
+  it is a pure function. Spec Step 2.
+- **Policy file:** `policies/refund-policy.v1.json` holds `version`, `approverRole`, and a per-currency
+  `autoExecuteMaxMinor` (USD 5000). A currency absent from the map has no threshold and never
+  auto-executes, and no conversion is inferred. An unreadable or invalid policy stops startup with
+  `ConfigError`. The loader lives in `src/storage` so the domain stays free of file I/O. Spec §Policy
+  rules.
+- **Window and exclusions are facts, not policy:** spec Step 2 makes the refund window and the
+  exclusions fixture-configured. Each order therefore carries `refundWindow {startsAt, days}` and
+  `exclusions` as facts, and the fixture decides what event starts the window. The window includes its
+  final millisecond.
+- **Eligibility result:** each of the four checks (`order_paid`, `within_refund_window`, `no_exclusion`,
+  `positive_refundable_balance`) reports `pass`, `fail`, `missing`, or `conflicting`. Any `fail` makes the
+  order `ineligible`, even if other facts are unknown. Otherwise any `missing` or `conflicting` check
+  makes it `unknown`, which the gate maps to VERIFY_FIRST. Refunds exceeding the payment, a currency
+  disagreement between records, and a window that starts in the future count as conflicting. A fully
+  refunded order is ineligible, which supports R14.
+- **Fact seeding is split across steps:** Step 2 defines the `EligibilityFacts` shape and tests it with
+  in-memory facts. Step 3 seeds fixture records into SQLite in that shape, so Step 2 does not depend on
+  storage.
+- **Step 2 exit criterion:** the contracts and checks that reject malformed input and out-of-scope
+  records exist and are unit-tested. The "before model calls or writes" ordering is proven end to end
+  once the services and coordinator exist (Steps 5–7).
+
 ## 2026-10-13 — Step 2 trusted caller context
 
 - **Split context:** `CallerIdentity` (`ownerId`, `actorId`, roles, permissions) is rebuilt from config
