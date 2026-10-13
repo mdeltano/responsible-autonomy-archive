@@ -3,6 +3,28 @@
 Record tooling choices the spec leaves open, and any deliberate deviation from [SPEC.md](SPEC.md),
 newest first. Each entry: date, decision, spec section affected, reason.
 
+## 2026-10-13 — Step 2 service inputs and planner contract
+
+- **Planner output variants:** the spec lists `tool_call`, `ask_question`, `propose_resolution`, and
+  `finish` but does not define them.
+  - `tool_call` wraps one of the eight allowlisted tools from spec §Internal agent tools, with that
+    tool's argument schema. There is no approval tool.
+  - `propose_resolution` is the planner's case-level conclusion: `{orderId, resolution: refund |
+    no_refund, reason}`. It has no effect on its own, and the coordinator accepts it only when verified
+    facts support it.
+  - `finish` carries a summary and no status. The application decides the terminal status.
+
+  To be revisited in Step 6 if the coordinator needs more. Spec Step 6.
+- **Rationale:** every planner variant requires a `rationale` of 1–500 characters. This is the "concise
+  operational rationale" of spec Step 8, and it is shorter than the 2000-character narrative cap.
+- **commit_refund arguments** are only `{proposalId}`. The planner cannot supply an idempotency key.
+  Spec §Policy rules.
+- **Service field names the spec leaves open:** `resolveApproval.decision` is `approve | deny`, and
+  `startEvaluation.split` is `development | held_out`. No service input carries caller identity or roles.
+  Spec §Application service interface.
+- **Blank text:** goals and answers must contain a non-whitespace character, so padding cannot satisfy
+  the minimum length.
+
 ## 2026-10-13 — Step 2 canonical contracts
 
 - **Tool-specific proposal arguments:** `ActionProposal` is a discriminated union on `tool`.
