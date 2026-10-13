@@ -9,7 +9,7 @@ Status values: `todo`, `in progress`, `done`, `deferred` (with reason).
 | Step | Milestone | Status | Exit criterion / notes |
 |---|---|---|---|
 | 1 Repository and development environment | 1 | done | 2026-10-12. Typecheck and tests pass, and invalid config fails with a message naming the variable. No provider call needed. |
-| 2 Contracts and trusted task context | 1 | todo | Malformed requests and unauthorized scope fail before model calls or writes. Eligibility is deterministic. |
+| 2 Contracts and trusted task context | 1 | in progress | Malformed requests and unauthorized scope fail before model calls or writes. Eligibility is deterministic. Done: primitives, typed errors, minor-unit money. |
 | 3 Storage and synthetic execution model | 1 | todo | Non-AI integration test: commits once, rejects over-refund, recovers an unknown-ack operation without repeating it. |
 | 4 Deterministic gate | 1 | todo | Policy tests cover all four decisions. Prompt text and confidence cannot change a verdict. |
 | 5 Approvals and atomic execution | 1 | todo | R03, R07, R08, R09 pass with a fake planner. |

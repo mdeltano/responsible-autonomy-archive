@@ -3,6 +3,22 @@
 Record tooling choices the spec leaves open, and any deliberate deviation from [SPEC.md](SPEC.md),
 newest first. Each entry: date, decision, spec section affected, reason.
 
+## 2026-10-13 — Step 2 contract primitives
+
+- **Opaque ID character set:** the spec requires IDs to be opaque strings of 1–128 characters. IDs and
+  idempotency keys are further limited to `[A-Za-z0-9][A-Za-z0-9._:-]*`, so they can appear verbatim in
+  logs, idempotency keys, and error messages without escaping. Config's `LOCAL_OWNER_ID` and
+  `LOCAL_ACTOR_ID` use the same schema. Spec §Application service interface.
+- **Error retryability:** `STATE_CONFLICT`, `PROVIDER_UNAVAILABLE`, and `TIMEOUT` default to
+  `retryable: true`, and all other codes default to false. Retrying a `STATE_CONFLICT` means a fresh read
+  and a new proposal, never a repeat of the same write. Spec §Reliability and limits.
+- **Error messages:** `INVALID_INPUT` names failing paths and rules but never echoes input values, and
+  it is truncated because key names are untrusted. `NOT_FOUND` uses one fixed message that does not echo
+  the requested ID. Spec §Security and privacy.
+- **Money:** a `Money` value is `{amountMinor, currency}` with checked safe-integer arithmetic. A
+  currency mismatch or a negative result throws `RangeError` as an invariant violation, because the gate
+  must reject such proposals before any arithmetic runs. Spec §Policy rules.
+
 ## 2026-10-12 — Baseline: Responsible Autonomy guide v2.0 (no MCP)
 
 - **Identity:** Project Sundance implements the *Responsible Autonomy Engineering Requirements and
