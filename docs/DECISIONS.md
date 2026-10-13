@@ -3,6 +3,56 @@
 Record tooling choices the spec leaves open, and any deliberate deviation from [SPEC.md](SPEC.md),
 newest first. Each entry: date, decision, spec section affected, reason.
 
+## 2026-10-13 — Step 3 storage and synthetic execution model
+
+- **SQLite setup:** `node:sqlite` with STRICT tables, foreign keys on, and WAL for file databases.
+  Migrations are append-only, numbered, and recorded in `schema_migrations`, and each runs in its own
+  transaction. The database file is `chmod 0600` on open. That is best effort: on Windows chmod only
+  toggles the read-only bit, so restrictive permissions there depend on the user profile's ACLs. Spec
+  §Security and privacy.
+- **Transactions:** `BEGIN IMMEDIATE` takes the write lock before any check runs. SQLite's busy timeout
+  (default 1000 ms) plus up to 3 extra attempts bound the contention. If the lock is never obtained, a
+  retryable `TIMEOUT` is raised with nothing written. Transaction bodies are synchronous, so no other
+  JavaScript runs between a check and its write. Spec Step 3.
+- **Isolation:** every storefront table is keyed by `instance_id`, and each task normally gets its own
+  instance. `tasks.instance_id` is deliberately not UNIQUE, because concurrency tests share an instance.
+- **Synthetic clock:** an instance stores the fixture's `syntheticNow` and its real creation time. Its
+  clock is `base.now() + (syntheticStart - createdAt)`, so fixture dates stay meaningful while time still
+  advances with the injected clock.
+- **Defense in depth on the ledger:**
+  - The commit derives amount, order, and expected versions from the immutable proposal. The caller
+    passes only the proposal ID.
+  - The idempotency key is `refund:<proposalId>`, and `operations` is UNIQUE on both
+    `(instance_id, idempotency_key)` and `proposal_id`.
+  - The payment update is conditional on the bound version, and the code asserts that exactly one row
+    changed.
+  - A CHECK constraint keeps `refunded_minor <= paid_minor` even against raw SQL.
+  - Proposals are immutable through UPDATE/DELETE triggers.
+  - There is one approval per proposal (UNIQUE), so a denial blocks that proposal.
+- **Required recheck hook:** `commitRefund` requires a `recheck` callback that runs inside the
+  transaction. Step 3 tests pass a no-op explicitly, and Step 5 passes the gate re-evaluation. No caller
+  can commit without choosing a recheck. Spec §Policy rules, Step 5.
+- **Ledger errors:** a version mismatch is a retryable `STATE_CONFLICT` (re-read, then form a new
+  proposal). An over-refund, a currency mismatch, or missing records is a non-retryable
+  `STATE_CONFLICT`. Rejected commits roll back, so their `blocked` audit event is written afterwards
+  in its own transaction.
+- **Verification:** `payments.fixture_refunded_minor` records refunds that predate the scenario.
+  `verifyRefund` marks an operation `verified` only when `refunded_minor` equals that baseline plus the
+  sum of the order's refund operations.
+- **Reconciliation rule:** after any commit error other than `STATE_CONFLICT`, the caller looks up the
+  operation by proposal (`findRefundOperation`) before retrying. Even a blind retry returns the existing
+  operation (`replayed: true`).
+- **Fault controls:** `FaultInjector` is a constructor option of `Storefront`. It offers lookup delay, a
+  one-shot state change before commit, a one-shot failure before COMMIT, and a one-shot lost
+  acknowledgment after COMMIT. Only tests and the evaluation harness construct it, and no tool or
+  service input reaches it.
+- **Fixture schema** lives in `src/contracts/scenario.ts`, so storage does not depend on the simulator.
+  A fixture's `scope` is trusted operator data, and its record `notes` are untrusted content. Fixture
+  validation requires every reference to resolve.
+- **Deferred to later steps:** the tables for questions, evidence, approvals, request keys, and
+  resolution notes exist now. Their repositories arrive with the steps that use them (5–6), and so does
+  the `record_resolution` write.
+
 ## 2026-10-13 — Step 2 clock, policy, and eligibility
 
 - **Clock:** `Clock.now()` returns epoch milliseconds. `systemClock` is used in production, and

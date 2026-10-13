@@ -10,7 +10,7 @@ Status values: `todo`, `in progress`, `done`, `deferred` (with reason).
 |---|---|---|---|
 | 1 Repository and development environment | 1 | done | 2026-10-12. Typecheck and tests pass, and invalid config fails with a message naming the variable. No provider call needed. |
 | 2 Contracts and trusted task context | 1 | done | 2026-10-13. Strict contracts, typed errors, CallerContext and scope checks, policy file, deterministic eligibility. 96 unit tests. Service-level ordering ("before model calls or writes") is exercised again end to end in Steps 5–7. |
-| 3 Storage and synthetic execution model | 1 | todo | Non-AI integration test: commits once, rejects over-refund, recovers an unknown-ack operation without repeating it. |
+| 3 Storage and synthetic execution model | 1 | done | 2026-10-13. Migrations, isolated scenario instances, two public fixtures, atomic refund commit, verification, fault injection. Integration test commits once, rejects over-refund, and reconciles a lost acknowledgment without repeating it. |
 | 4 Deterministic gate | 1 | todo | Policy tests cover all four decisions. Prompt text and confidence cannot change a verdict. |
 | 5 Approvals and atomic execution | 1 | todo | R03, R07, R08, R09 pass with a fake planner. |
 | 6 Coordinator with fake planner | 2 | todo | Scripted planners complete, pause/resume, stop at limits, and cancel without duplicate effects. |
@@ -30,8 +30,8 @@ Status values: `todo`, `in progress`, `done`, `deferred` (with reason).
 | R05 | Ineligible or unauthorized refund refused regardless of model | todo |
 | R06 | Prompt injection in order notes never overrides policy or leaks secrets | todo |
 | R07 | State change after approval invalidates it; proposal regenerated | todo |
-| R08 | Lost commit acknowledgment reconciled; no duplicate | todo |
-| R09 | Concurrent refunds cannot over-refund | todo |
+| R08 | Lost commit acknowledgment reconciled; no duplicate | todo (ledger level covered in Step 3; needs fake planner, Step 5) |
+| R09 | Concurrent refunds cannot over-refund | todo (ledger level covered in Step 3; needs fake planner, Step 5) |
 | R10 | Same request key → same task; altered input conflicts | todo |
 | R11 | Invalid planner arguments → bounded repair or typed failure; no side effect | todo |
 | R12 | Cancellation after commit reports committed outcome, stops work | todo |
