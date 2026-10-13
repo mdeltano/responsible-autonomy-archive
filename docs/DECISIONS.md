@@ -3,6 +3,23 @@
 Record tooling choices the spec leaves open, and any deliberate deviation from [SPEC.md](SPEC.md),
 newest first. Each entry: date, decision, spec section affected, reason.
 
+## 2026-10-13 — Step 2 trusted caller context
+
+- **Split context:** `CallerIdentity` (`ownerId`, `actorId`, roles, permissions) is rebuilt from config
+  on every call, so a revoked role takes effect immediately. `CustomerScope` (authorized `customerIds`,
+  plus an optional `orderIds` narrowing) is bound with the identity into a frozen `CallerContext`
+  snapshot when the task starts. Later calls take roles and permissions from the current identity and
+  scope from the snapshot, so nothing after task start can widen scope. A caller whose owner differs
+  from the snapshot's gets `NOT_FOUND`. Spec Step 2.
+- **Scope source:** the trusted section of the scenario definition (Step 3 fixtures) supplies the task's
+  customer scope, as in the spec's worked example, where the coordinator supplies it. Goals, answers,
+  and notes never do.
+- **Order access:** an order is in scope only when its owning customer, as read from the trusted record,
+  is authorized. Knowing an order ID grants nothing. Spec §Internal agent tools.
+- **Permissions:** the local operator always holds `task:start`, `task:read`, `task:answer`, and
+  `task:cancel`, and holds `evaluation:run` only when `EVALUATION_ENABLED=true`. Approval authority is
+  role-based (`requireRole` against `Approval.requiredRole`), not a permission. Default roles are empty.
+
 ## 2026-10-13 — Completion checks for `finish` (target for Step 6)
 
 The spec accepts `finish` "only after application-side completion checks confirm the outcome" but does
