@@ -57,3 +57,17 @@ export function listAuditEvents(db: Database, taskId: string): AuditEvent[] {
       }),
     );
 }
+
+// One page of a task's events in sequence order, starting at `fromSequence` (spec §Application service
+// interface: getAudit). Reads one extra row to know whether another page exists.
+export function listAuditPage(
+  db: Database,
+  taskId: string,
+  fromSequence: number,
+  limit: number,
+): { events: AuditEvent[]; nextSequence: number | null } {
+  const events = listAuditEvents(db, taskId).filter((e) => e.sequence >= fromSequence);
+  const page = events.slice(0, limit);
+  const next = events[limit];
+  return { events: page, nextSequence: next === undefined ? null : next.sequence };
+}

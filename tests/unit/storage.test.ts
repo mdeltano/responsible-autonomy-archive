@@ -4,6 +4,7 @@ import { AppError } from "../../src/contracts/errors.js";
 import { ManualClock } from "../../src/domain/clock.js";
 import { evaluateEligibility, factsFromRecords } from "../../src/domain/eligibility.js";
 import { migrate, openDatabase, transaction } from "../../src/storage/database.js";
+import { MIGRATIONS } from "../../src/storage/migrations.js";
 import { getScenarioInstance, instanceClock } from "../../src/storage/instances.js";
 import { readProposal } from "../../src/storage/proposals.js";
 import { readOrder, readPaymentForOrder } from "../../src/storage/records.js";
@@ -16,7 +17,7 @@ describe("migrations (spec Step 3)", () => {
     const db = openDatabase(":memory:");
     migrate(db);
     const versions = db.prepare("SELECT version FROM schema_migrations").all();
-    expect(versions).toHaveLength(1);
+    expect(versions).toHaveLength(MIGRATIONS.length);
   });
 });
 

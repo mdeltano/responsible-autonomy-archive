@@ -76,3 +76,11 @@ export function readPaymentForOrder(db: Database, instanceId: string, orderId: s
     version: int(row, "version"),
   };
 }
+
+// Orders belonging to a customer, for the identity lookup. Scope filtering is the caller's job.
+export function listOrderIdsForCustomer(db: Database, instanceId: string, customerId: string): string[] {
+  return db
+    .prepare("SELECT id FROM orders WHERE instance_id = ? AND customer_id = ? ORDER BY id")
+    .all(instanceId, customerId)
+    .map((row) => text(row, "id"));
+}

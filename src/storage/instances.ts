@@ -20,6 +20,15 @@ export function createScenarioInstance(
   db: Database,
   input: { ownerId: string; fixture: ScenarioFixture; clock: Clock },
 ): ScenarioInstance {
+  return transaction(db, () => seedScenarioInstance(db, input));
+}
+
+// Same as createScenarioInstance, for a caller that is already inside a transaction (startTask creates
+// the instance, the task, and its request key atomically).
+export function seedScenarioInstance(
+  db: Database,
+  input: { ownerId: string; fixture: ScenarioFixture; clock: Clock },
+): ScenarioInstance {
   const { fixture } = input;
   const instance: ScenarioInstance = {
     id: newId("inst"),
@@ -29,40 +38,38 @@ export function createScenarioInstance(
     syntheticStart: fixture.syntheticNow,
     createdAt: toUtcTimestamp(input.clock.now()),
   };
-  transaction(db, () => {
-    db.prepare(
-      `INSERT INTO scenario_instances (id, owner_id, fixture_id, fixture_version, synthetic_start, created_at)
-       VALUES (:id, :ownerId, :fixtureId, :fixtureVersion, :syntheticStart, :createdAt)`,
-    ).run({ ...instance });
-    const insertCustomer = db.prepare(
-      `INSERT INTO customers (instance_id, id, display_name, email, version) VALUES (?, ?, ?, ?, 0)`,
+  db.prepare(
+    `INSERT INTO scenario_instances (id, owner_id, fixture_id, fixture_version, synthetic_start, created_at)
+     VALUES (:id, :ownerId, :fixtureId, :fixtureVersion, :syntheticStart, :createdAt)`,
+  ).run({ ...instance });
+  const insertCustomer = db.prepare(
+    `INSERT INTO customers (instance_id, id, display_name, email, version) VALUES (?, ?, ?, ?, 0)`,
+  );
+  for (const c of fixture.customers) insertCustomer.run(instance.id, c.id, c.displayName, c.email);
+  const insertOrder = db.prepare(
+    `INSERT INTO orders (instance_id, id, customer_id, currency, payment_status, refund_window_starts_at,
+       refund_window_days, exclusions_json, notes, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+  );
+  for (const o of fixture.orders) {
+    insertOrder.run(
+      instance.id,
+      o.id,
+      o.customerId,
+      o.currency,
+      o.paymentStatus,
+      o.refundWindow?.startsAt ?? null,
+      o.refundWindow?.days ?? null,
+      o.exclusions === null ? null : JSON.stringify(o.exclusions),
+      o.notes,
     );
-    for (const c of fixture.customers) insertCustomer.run(instance.id, c.id, c.displayName, c.email);
-    const insertOrder = db.prepare(
-      `INSERT INTO orders (instance_id, id, customer_id, currency, payment_status, refund_window_starts_at,
-         refund_window_days, exclusions_json, notes, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-    );
-    for (const o of fixture.orders) {
-      insertOrder.run(
-        instance.id,
-        o.id,
-        o.customerId,
-        o.currency,
-        o.paymentStatus,
-        o.refundWindow?.startsAt ?? null,
-        o.refundWindow?.days ?? null,
-        o.exclusions === null ? null : JSON.stringify(o.exclusions),
-        o.notes,
-      );
-    }
-    const insertPayment = db.prepare(
-      `INSERT INTO payments (instance_id, id, order_id, destination, currency, paid_minor, fixture_refunded_minor,
-         refunded_minor, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-    );
-    for (const p of fixture.payments) {
-      insertPayment.run(instance.id, p.id, p.orderId, p.destination, p.currency, p.paidMinor, p.refundedMinor, p.refundedMinor);
-    }
-  });
+  }
+  const insertPayment = db.prepare(
+    `INSERT INTO payments (instance_id, id, order_id, destination, currency, paid_minor, fixture_refunded_minor,
+       refunded_minor, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+  );
+  for (const p of fixture.payments) {
+    insertPayment.run(instance.id, p.id, p.orderId, p.destination, p.currency, p.paidMinor, p.refundedMinor, p.refundedMinor);
+  }
   return instance;
 }
 

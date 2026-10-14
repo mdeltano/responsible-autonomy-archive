@@ -224,3 +224,107 @@ export function verifyRefund(db: Database, input: { operationId: string; actorId
     return { operation: result, verified };
   });
 }
+
+export function resolutionIdempotencyKey(proposalId: string): string {
+  return `resolution:${proposalId}`;
+}
+
+export function listTaskOperations(db: Database, taskId: string): Operation[] {
+  return db.prepare("SELECT * FROM operations WHERE task_id = ? ORDER BY committed_at, rowid").all(taskId).map(toOperation);
+}
+
+export interface NoteCommitState {
+  proposal: ActionProposal;
+  order: OrderRecord;
+}
+
+// Stores a resolution note under its proposal-scoped key, in one transaction with its recheck and audit
+// event (spec §Policy rules: record-resolution writes also use stable operation keys).
+export function commitResolutionNote(
+  db: Database,
+  input: { proposalId: string; actorId: string; now: string },
+  hooks: { recheck: (state: NoteCommitState) => void },
+): CommitResult {
+  return transaction(db, () => {
+    const stored = readProposal(db, input.proposalId);
+    if (!stored) throw notFound();
+    const { proposal } = stored;
+    if (proposal.tool !== "record_resolution") {
+      throw new AppError("INVALID_INPUT", "Proposal is not a resolution note", { taskId: proposal.taskId });
+    }
+    const instanceId = instanceOfTask(db, proposal.taskId);
+    const key = resolutionIdempotencyKey(proposal.id);
+    const existing = readOperationByKey(db, instanceId, key);
+    if (existing) return { operation: existing, replayed: true };
+
+    const order = readOrder(db, instanceId, proposal.arguments.orderId);
+    if (!order) throw conflict("Order record not found", proposal.taskId, false);
+    if (proposal.stateVersions[order.id] !== order.version) {
+      throw conflict("Records changed since the proposal was formed", proposal.taskId, true);
+    }
+    hooks.recheck({ proposal, order });
+
+    const operation: Operation = {
+      id: newId("op"),
+      instanceId,
+      taskId: proposal.taskId,
+      proposalId: proposal.id,
+      idempotencyKey: key,
+      kind: "resolution_note",
+      orderId: order.id,
+      amountMinor: null,
+      currency: null,
+      status: "committed",
+      committedAt: input.now,
+      verifiedAt: null,
+    };
+    db.prepare(
+      `INSERT INTO operations (id, instance_id, task_id, proposal_id, idempotency_key, kind, order_id, amount_minor,
+         currency, status, committed_at, verified_at)
+       VALUES (?, ?, ?, ?, ?, 'resolution_note', ?, NULL, NULL, 'committed', ?, NULL)`,
+    ).run(operation.id, instanceId, operation.taskId, proposal.id, key, order.id, input.now);
+    db.prepare(
+      "INSERT INTO resolution_notes (operation_id, instance_id, order_id, note, created_at) VALUES (?, ?, ?, ?, ?)",
+    ).run(operation.id, instanceId, order.id, proposal.arguments.note, input.now);
+    appendAuditEvent(db, {
+      taskId: proposal.taskId,
+      timestamp: input.now,
+      type: "execution",
+      actorId: input.actorId,
+      proposalId: proposal.id,
+      operationId: operation.id,
+      evidenceIds: proposal.evidenceIds,
+      ruleIds: proposal.ruleIds,
+      summary: `Recorded a resolution note on order ${order.id}.`,
+      result: "success",
+    });
+    return { operation, replayed: false };
+  });
+}
+
+// Commit attempts (spec §Reliability and limits): an attempt is marked in flight in its own
+// transaction before the commit and resolved once the outcome is known. An attempt still in flight
+// after a crash or a lost acknowledgment is reconciled by looking the operation up, never by writing.
+export function beginCommitAttempt(db: Database, input: { proposalId: string; taskId: string; now: string }): void {
+  transaction(db, () => {
+    db.prepare(
+      `INSERT INTO commit_attempts (proposal_id, task_id, status, started_at, resolved_at)
+       VALUES (?, ?, 'in_flight', ?, NULL)
+       ON CONFLICT (proposal_id) DO UPDATE SET status = 'in_flight', started_at = excluded.started_at, resolved_at = NULL`,
+    ).run(input.proposalId, input.taskId, input.now);
+  });
+}
+
+export function resolveCommitAttempt(db: Database, proposalId: string, now: string): void {
+  db.prepare("UPDATE commit_attempts SET status = 'resolved', resolved_at = ? WHERE proposal_id = ? AND status = 'in_flight'").run(
+    now,
+    proposalId,
+  );
+}
+
+export function listInFlightAttempts(db: Database, taskId: string): string[] {
+  return db
+    .prepare("SELECT proposal_id FROM commit_attempts WHERE task_id = ? AND status = 'in_flight' ORDER BY started_at")
+    .all(taskId)
+    .map((row) => text(row, "proposal_id"));
+}

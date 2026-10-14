@@ -206,4 +206,33 @@ CREATE TABLE audit_events (
 ) STRICT;
 `,
   },
+  {
+    version: 2,
+    name: "task lifecycle and commit attempts",
+    sql: `
+-- Coordinator checkpoint (spec Step 6): counters, active time, and validated history, saved after each
+-- step so a restarted process resumes instead of repeating work.
+ALTER TABLE tasks ADD COLUMN checkpoint_json TEXT;
+ALTER TABLE tasks ADD COLUMN cancel_requested INTEGER NOT NULL DEFAULT 0 CHECK (cancel_requested IN (0, 1));
+-- Retention counts from here, so a waiting task cannot be purged (see DECISIONS.md).
+ALTER TABLE tasks ADD COLUMN terminal_at TEXT;
+
+-- A refund commit that has started but whose outcome has not been reconciled yet. Written in its own
+-- transaction before the commit, so after a crash or a lost acknowledgment the engine knows to look up
+-- the operation instead of writing again (spec §Reliability and limits).
+CREATE TABLE commit_attempts (
+  proposal_id TEXT PRIMARY KEY REFERENCES proposals (id),
+  task_id TEXT NOT NULL REFERENCES tasks (id),
+  status TEXT NOT NULL CHECK (status IN ('in_flight', 'resolved')),
+  started_at TEXT NOT NULL,
+  resolved_at TEXT,
+  CHECK ((status = 'resolved') = (resolved_at IS NOT NULL))
+) STRICT;
+CREATE INDEX commit_attempts_task ON commit_attempts (task_id);
+
+CREATE INDEX approvals_task ON approvals (task_id);
+CREATE INDEX questions_task ON questions (task_id);
+CREATE INDEX operations_task ON operations (task_id);
+`,
+  },
 ];
