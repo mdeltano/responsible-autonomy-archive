@@ -1,44 +1,34 @@
 #!/usr/bin/env node
+import { existsSync } from "node:fs";
 import { ConfigError, loadConfig } from "../config.js";
-import { ENGINE_VERSION } from "../version.js";
+import { createCallerIdentity } from "../domain/authorization.js";
+import { runCli } from "./commands.js";
+import { runDemo } from "./demo.js";
+import { terminalIO } from "./io.js";
+import { openRuntime } from "./runtime.js";
 
-// Local command-line entry point (spec Step 7). Keep this thin: validate arguments, establish trusted
-// caller context, call application services, format results. Commands land with Steps 7 and 9.
+// Local command-line entry point (spec Step 7). Loads configuration (from the environment, plus an
+// optional .env file), builds the trusted caller identity from it, and hands off to the commands.
 
-const COMMANDS: Record<string, string> = {
-  demo: "Run the interactive fake-planner demo (Step 7)",
-  evaluate: "Run the paired evaluation suite (Step 9)",
-};
-
-function usage(): string {
-  const lines = Object.entries(COMMANDS).map(([name, text]) => `  ${name.padEnd(10)} ${text}`);
-  return [`responsible-autonomy v${ENGINE_VERSION}`, "", "Usage: responsible-autonomy <command>", "", ...lines].join("\n");
-}
-
-function main(argv: string[]): number {
+async function main(argv: string[]): Promise<number> {
+  if (existsSync(".env")) process.loadEnvFile(".env");
   const config = loadConfig();
-  const command = argv[0];
-
-  if (command === undefined || command === "--help" || command === "-h") {
-    console.log(usage());
-    return 0;
+  const io = terminalIO();
+  const { app, db } = openRuntime(config);
+  try {
+    return await runCli({ app, caller: createCallerIdentity(config), io, evaluationEnabled: config.evaluationEnabled }, argv, runDemo);
+  } finally {
+    io.close();
+    db.close();
   }
-  if (!(command in COMMANDS)) {
-    console.error(`Unknown command: ${command}\n\n${usage()}`);
-    return 2;
-  }
-  if (command === "evaluate" && !config.evaluationEnabled) {
-    console.error("Evaluation is disabled. Set EVALUATION_ENABLED=true to run it.");
-    return 1;
-  }
-  // Honest status: report unimplemented commands as failures rather than pretending to succeed.
-  console.error(`'${command}' is not implemented yet. See docs/STATUS.md.`);
-  return 1;
 }
 
-try {
-  process.exitCode = main(process.argv.slice(2));
-} catch (err: unknown) {
-  console.error(err instanceof ConfigError ? err.message : "Fatal startup error");
-  process.exitCode = 1;
-}
+main(process.argv.slice(2)).then(
+  (code) => {
+    process.exitCode = code;
+  },
+  (error: unknown) => {
+    console.error(error instanceof ConfigError ? error.message : "Fatal startup error");
+    process.exitCode = 1;
+  },
+);
