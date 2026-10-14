@@ -21,6 +21,8 @@ const envSchema = z.object({
   MAX_TOKENS_PER_TASK: z.preprocess(emptyToUndefined, z.coerce.number().int().positive().optional()),
   EVALUATION_ENABLED: z.preprocess(emptyToUndefined, z.stringbool().default(false)),
   POLICY_PATH: z.preprocess(emptyToUndefined, z.string().min(1).default("./policies/refund-policy.v1.json")),
+  // Model-visible scenario fixtures offered by the demo. Hidden expected outcomes are never loaded here.
+  FIXTURES_DIR: z.preprocess(emptyToUndefined, z.string().min(1).default("./fixtures/public")),
   CURRENCY: z.preprocess(emptyToUndefined, currencyCode.default("USD")),
   // Local single-owner demo identity (spec §Policy rules, Step 2): a documented demo assumption,
   // not authentication. Never populated from task input.
@@ -56,6 +58,7 @@ export interface Config {
   maxTokensPerTask: number | null;
   evaluationEnabled: boolean;
   policyPath: string;
+  fixturesDir: string;
   currency: string;
   localOwnerId: string;
   localActorId: string;
@@ -105,6 +108,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     maxTokensPerTask: e.MAX_TOKENS_PER_TASK ?? null,
     evaluationEnabled: e.EVALUATION_ENABLED,
     policyPath: e.POLICY_PATH,
+    fixturesDir: e.FIXTURES_DIR,
     currency: e.CURRENCY,
     localOwnerId: e.LOCAL_OWNER_ID,
     localActorId: e.LOCAL_ACTOR_ID,
