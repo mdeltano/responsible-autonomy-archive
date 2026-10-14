@@ -26,8 +26,9 @@ Every proposed action gets one decision:
 This is a portfolio project. It does not handle real payments and is not production-ready. Its
 evaluation results are measured on synthetic scenarios only.
 
-> **Status:** Step 1 of 10 (repository and environment) is complete. The CLI validates configuration, but
-> `demo` and `evaluate` are not implemented yet. See [docs/STATUS.md](docs/STATUS.md).
+> **Status:** Steps 1–7 of 10 are complete. The deterministic engine, approvals, coordinator, and local CLI
+> work end to end with an offline fake planner. A real model provider (Step 8) and the paired evaluation
+> (Step 9) are not implemented yet. See [docs/STATUS.md](docs/STATUS.md).
 
 ## Requirements
 
@@ -51,7 +52,7 @@ npm run build
 | `npm run typecheck` | Type-check sources and tests |
 | `npm test` | Run all tests (offline, fake planner) |
 | `npm run test:integration` | Run integration tests only |
-| `npm run demo` | Interactive local demo (Step 7) |
+| `npm run demo` | Guided local demo with the offline fake planner |
 | `npm run evaluate` | Paired evaluation suite (Step 9; requires `EVALUATION_ENABLED=true`) |
 
 ## Configuration
@@ -68,6 +69,7 @@ message naming the bad variable. See [.env.example](.env.example) for every opti
 | `MAX_TOKENS_PER_TASK` | — | Positive integer required before a real provider is enabled |
 | `EVALUATION_ENABLED` | `false` | Developer-only evaluation |
 | `POLICY_PATH` | `./policies/refund-policy.v1.json` | Versioned refund policy |
+| `FIXTURES_DIR` | `./fixtures/public` | Synthetic scenarios offered by the demo |
 | `CURRENCY` | `USD` | Three-letter uppercase code |
 | `LOCAL_OWNER_ID` / `LOCAL_ACTOR_ID` | `local-owner` / `local-operator` | Demo assumption; see below |
 | `LOCAL_ROLES` | (none) | Comma-separated, e.g. `refund_approver` |
@@ -75,7 +77,7 @@ message naming the bad variable. See [.env.example](.env.example) for every opti
 | `MAX_PLANNING_STEPS` / `MAX_TOOL_CALLS` | `15` / `20` | Per task |
 | `MAX_QUESTIONS` / `MAX_PROVIDER_RETRIES` | `3` / `2` | Per task |
 | `ACTIVE_TIMEOUT_MS` | `120000` | Active execution only; waiting does not count |
-| `PENDING_TASK_TTL_MS` / `APPROVAL_TTL_MS` | 24 h / 5 min | |
+| `PENDING_TASK_TTL_MS` / `APPROVAL_TTL_MS` | 24 h / 7 days | Waiting for an answer / for an approver |
 | `MAX_ACTIVE_TASKS` / `MAX_QUEUED_TASKS` | `2` / `10` | Per owner |
 | `RETENTION_DAYS` | `7` | |
 | `LOG_LEVEL` / `LOG_RAW_CONTENT` | `info` / `false` | Diagnostics go to stderr |
@@ -84,6 +86,48 @@ message naming the bad variable. See [.env.example](.env.example) for every opti
 application treats that as trusted caller context. This is not production authentication. Approving a
 large refund requires `LOCAL_ROLES=refund_approver` and explicit confirmation typed by the operator. The
 agent cannot approve its own proposals.
+
+## Local demo
+
+```sh
+cp .env.example .env              # optional; the CLI reads .env when present
+# set LOCAL_ROLES=refund_approver in .env to be able to approve large refunds
+npm run demo
+```
+
+The guided demo lists the installed scenarios, submits a goal, and prints each step. Every gate
+decision is shown with its exact proposal: action, original destination, decision, rules, record
+versions, digest, and the evidence it cites. The demo then asks for an answer or for an approval
+decision, and ends with the outcome verified against the ledger. Type `cancel` at a prompt to cancel.
+Press Enter to leave a task waiting and pick it up later:
+
+```sh
+npx tsx src/cli/main.ts tasks                          # recent tasks
+npx tsx src/cli/main.ts show <taskId>                  # status, question or approval, result
+npx tsx src/cli/main.ts proposal <taskId> <proposalId> # exact action, evidence, decision, rules
+npx tsx src/cli/main.ts audit <taskId>                 # ordered audit events
+npx tsx src/cli/main.ts answer <taskId> <questionId> <answer>
+npx tsx src/cli/main.ts approve <taskId> <approvalId>  # shows the proposal, asks you to type "approve"
+npx tsx src/cli/main.ts deny <taskId> <approvalId>
+npx tsx src/cli/main.ts cancel <taskId>
+npx tsx src/cli/main.ts resume                         # recover tasks interrupted by a restart
+```
+
+After `npm run build`, the same commands are available as `node dist/cli/main.js <command>`.
+
+| Scenario | Shows |
+|---|---|
+| `refund-small` | Straightforward completion. The order is found by lookup, so no question is needed |
+| `refund-large` | The guide's worked example: pause for approval, then commit once and verify |
+| `refund-ambiguous` | One precise question when records cannot tell which order is meant |
+| `refund-ineligible` | Refusal under the refund window, with a recorded no-refund resolution |
+| `refund-completed` | Recognizing that a refund already happened. No further refund is made |
+| `refund-injection` | Order notes with injected instructions, which change nothing |
+
+The demo's planner is a deterministic stand-in for a model. Adversarial planners (for example, one
+that obeys injected notes, invents approvals, or repeats commits) are exercised in the test suite.
+The approval-invalidation demo is reproduced in `tests/integration/approvals.test.ts` (R07), because
+it needs a ledger change between approval and commit.
 
 ## Privacy
 

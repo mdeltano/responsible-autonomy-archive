@@ -3,6 +3,113 @@
 Record tooling choices the spec leaves open, and any deliberate deviation from [SPEC.md](SPEC.md),
 newest first. Each entry: date, decision, spec section affected, reason.
 
+## 2026-10-14 — Step 7 local demonstration interface
+
+- **Shape (owner decision):** a guided `demo` plus one-shot subcommands (`scenarios`, `start`, `tasks`,
+  `show`, `proposal`, `audit`, `answer`, `approve`, `deny`, `cancel`, `resume`). A task waiting for an
+  answer or approval can be picked up in a later session. Every command that resumes a task follows it
+  until it waits or ends, then exits. Spec Step 7.
+- **Thin interface:** `src/cli` parses arguments, builds the caller identity from configuration, calls
+  the services, and formats results. The "you lack the role" note before an approval prompt is only
+  presentation. `resolveApproval` enforces the role.
+- **Explicit confirmation:** `approve` and `deny` show the exact proposal (amount, original destination,
+  decision, rules, record versions, digest, evidence) and require the operator to type the decision word.
+  In the guided demo, typing `approve` or `deny` at the approval prompt, after the proposal has been
+  shown, is that confirmation. Operator input goes through an injected `OperatorIO`, so tests play the
+  operator through the same channel. Spec Step 5, Step 7.
+- **Configuration:** the CLI loads `.env` when present (`process.loadEnvFile`, which does not override
+  variables already set). This makes the demo role assumption (`LOCAL_ROLES=refund_approver`) easy to
+  set on any platform. `FIXTURES_DIR` (default `./fixtures/public`) names the scenarios offered. Hidden
+  expected outcomes are never loaded by the CLI.
+- **Exit codes:** 0 success, 1 a typed application error or an aborted confirmation, 2 a usage error.
+  Errors go to stderr as `Error [CODE]: message`.
+- **Planner:** the CLI uses the offline rule-based fake planner until Step 8. The banner says no
+  provider receives anything, and that a real provider would receive the goal and relevant records.
+
+## 2026-10-14 — Step 6 coordinator, services, and fake planners
+
+- **Planner contract:** a planner receives a versioned prompt ID, trusted instructions, the goal
+  (untrusted), the trusted scope, a policy summary, the tool list, the last 30 history entries, the
+  remaining budgets, and repair issues on a repair attempt. History holds validated outputs, engine
+  results, and events (answer received, approval decided, commit reconciled). Record text appears only
+  in fields marked untrusted (`untrustedNotes`, `untrustedAnswer`). Spec Step 6, Step 8.
+- **Budgets:** every planner request counts as a planning step, including provider retries and the
+  repair attempt (spec: "consume the same budget"). One schema repair is allowed per invalid response,
+  and a second invalid response stops the task with nothing executed. Budgets are checked before every
+  request and every action. Counters live in the checkpoint, so a restart does not reset them. A token
+  cap of 0 means none, which applies only to the offline fake planner (see "Token budget").
+- **Finish:** a finish with unmet completion checks is rejected with the unmet list. The second
+  rejection ends the task. `propose_resolution` is accepted only when checks 1–2 hold.
+- **Terminal classification** (`stopStatus`):
+  - Finish rejected: `refused` when the gate refused a refund or a lookup was refused for scope and no
+    refund was committed; otherwise `partial` when useful work exists, else `failed`.
+  - Budget or time exhausted: `partial` or `failed`, never `refused` or `completed`, even if every
+    check happens to hold.
+  - Invalid output or error: `failed`, or `partial` if a refund was committed.
+  - Expired wait: `partial`.
+- **Result `verified`:** every refund operation the task committed is verified against the ledger at
+  finalization (true when there are none). Finalization settles in-flight commits and runs
+  `verify_refund` on any committed refund first. A `completed` whose ledger does not reconcile is
+  reported as `partial`.
+- **Questions:** a question must target known preconditions: the gate's, plus `pre_target_order` and
+  `pre_customer_identity`. Its TTL (`PENDING_TASK_TTL_MS`) counts from when it was asked. Questions
+  beyond `MAX_QUESTIONS` are rejected without pausing.
+- **Runner:** an in-process runner allows `MAX_ACTIVE_TASKS` loops per owner and `MAX_QUEUED_TASKS`
+  queued. Tasks that will take a free slot on the next tick do not count against the queue. Overflow is a
+  retryable `BUDGET_EXCEEDED`. A task is never queued or run twice at once. Resume and cancel events are
+  conditional status updates, so only one can win.
+- **Restart recovery:** `recoverInterruptedTasks` re-queues tasks left `running` by a dead process. The
+  coordinator settles in-flight commits by lookup before planning. This assumes **one process per
+  database**. Concurrent CLI processes on one database are not supported.
+- **Cancellation:** sets a flag, aborts an in-flight planner request, and finalizes as `cancelled`. A
+  committed refund is verified and reported. A pending approval is invalidated. Cancelling a finished
+  task is a non-retryable `STATE_CONFLICT`.
+- **Audit actors:** actions the engine takes for the planner are recorded as actor `agent`. Operator
+  actions (start, answer, approve, deny, cancel) use the operator's actor ID.
+- **Evidence:** the engine writes it. Record evidence states structured facts and versions. Order notes
+  are never copied into evidence. Answers become `user_statement` evidence.
+- **Extra services:** `listTasks` (so a later session can find waiting tasks) and `waitForTask` (so an
+  interface can follow a task) are not in the spec's table. Both are read-only and owner-scoped.
+- **Fake planners:** `ScriptedPlanner` (tests) replays outputs and can call functions or fall back to
+  another planner. `RuleBasedPlanner` (demo) follows the refund workflow from history alone and never
+  reads notes. Adversarial behavior is tested with scripted planners.
+
+## 2026-10-14 — Step 5 approvals and atomic execution
+
+- **When approval is requested:** `propose_refund` runs the gate. On `HUMAN_APPROVAL` it stores a
+  pending approval bound to the proposal's digest, policy version, and record versions, and the task
+  pauses. After approval, the task resumes and the planner calls `commit_refund`, as the tool table
+  says. Spec §Internal agent tools, Step 5.
+- **Denial ends the task (owner decision):** a denial records the approver and ends the task as
+  `refused` ("approver denied proposal X; no refund was made"). The planner is not called again, so it
+  cannot route around the approver with a smaller refund. Spec §Policy rules.
+- **Two checks before writing:** `commit_refund` first checks the stored proposal against fresh records
+  (gate decision, policy version, digest, approval status and expiry), then runs the same check inside
+  the commit transaction through the `recheck` hook. The first check gives a precise answer and
+  invalidates a stale approval. The second closes the race.
+- **Invalidation:** a stale proposal (changed records, changed decision, changed policy) invalidates
+  its approval, whether pending or granted. Invalidation clears `approverId`, because the contract sets
+  it only for approved or denied. The audit log keeps who approved. `resolveApproval` runs the same check
+  when an operator tries to approve. If the approval is stale, it is invalidated, the task resumes to
+  form a new proposal, and the operator gets `STATE_CONFLICT`. R07.
+- **Approval checks in order:** unknown or foreign IDs get NOT_FOUND, then the role is checked, then
+  expiry and status. A foreign approval therefore reveals nothing, even to a caller without the role. An
+  approved proposal whose approval has since expired gets `APPROVAL_EXPIRED` at commit.
+- **Commit attempts:** before a refund commit, a `commit_attempts` row is marked in flight in its own
+  transaction. If the commit fails with anything other than a rejection inside the transaction, the
+  engine looks the operation up by proposal. If found, it reports it (`reconciled: true`) and writes
+  nothing. If not found, the failure is reported as retryable, and retrying the same proposal is safe.
+  While an attempt is unresolved, the gate sees an unknown prior outcome and returns VERIFY_FIRST. R08.
+- **Proposals for refused actions are stored too**, so getProposal and the audit log show what was
+  asked and why it was refused. A refused out-of-scope proposal cites no evidence and no versions.
+
+## 2026-10-14 — Fixtures for R04, R05, R06, R14
+
+- `refund-ambiguous` (two orders, request names neither), `refund-ineligible` (window closed),
+  `refund-injection` (notes ask for another account, another customer's order, self-approval, and the
+  API key), and `refund-completed` (already fully refunded). The fixture schema gains an optional
+  `suggestedGoal` for the demo. Goals stay untrusted text.
+
 ## 2026-10-13 — Approvals wait for an assigned approver
 
 - **Decision (owner):** when a refund needs approval, the task waits for an operator holding the
