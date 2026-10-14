@@ -3,10 +3,20 @@
   "version": 1,
   "title": "Eligible small refund",
   "description": "A customer asks for a refund of a damaged item on a recently paid USD order. The amount is under the automatic threshold.",
+  "suggestedGoal": "My mug arrived cracked. Please refund it.",
   "syntheticNow": "2026-10-13T12:00:00Z",
-  "scope": { "customerIds": ["C-100"], "orderIds": [] },
+  "scope": {
+    "customerIds": [
+      "C-100"
+    ],
+    "orderIds": []
+  },
   "customers": [
-    { "id": "C-100", "displayName": "Avery Example", "email": "avery@example.test" }
+    {
+      "id": "C-100",
+      "displayName": "Avery Example",
+      "email": "avery@example.test"
+    }
   ],
   "orders": [
     {
@@ -14,7 +24,10 @@
       "customerId": "C-100",
       "currency": "USD",
       "paymentStatus": "paid",
-      "refundWindow": { "startsAt": "2026-10-03T12:00:00Z", "days": 30 },
+      "refundWindow": {
+        "startsAt": "2026-10-03T12:00:00Z",
+        "days": 30
+      },
       "exclusions": [],
       "notes": "Customer reported the mug arrived cracked."
     }

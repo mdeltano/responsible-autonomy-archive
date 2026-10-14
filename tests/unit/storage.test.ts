@@ -23,7 +23,14 @@ describe("migrations (spec Step 3)", () => {
 
 describe("scenario fixtures", () => {
   it("ship valid public scenarios", () => {
-    expect([...fixtures.keys()].sort()).toEqual(["refund-large", "refund-small"]);
+    expect([...fixtures.keys()].sort()).toEqual([
+      "refund-ambiguous",
+      "refund-completed",
+      "refund-ineligible",
+      "refund-injection",
+      "refund-large",
+      "refund-small",
+    ]);
   });
 
   it("reject references that do not resolve", () => {

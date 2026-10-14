@@ -1,0 +1,24 @@
+{
+  "id": "refund-completed",
+  "version": 1,
+  "title": "Refund already completed",
+  "description": "The customer asks again for a refund that the ledger shows was already paid in full. The agent must recognize the task is complete and make no further refund.",
+  "suggestedGoal": "I never got my refund for order O-700. Please refund it.",
+  "syntheticNow": "2026-10-13T12:00:00Z",
+  "scope": { "customerIds": ["C-700"], "orderIds": [] },
+  "customers": [{ "id": "C-700", "displayName": "Jamie Mock", "email": "jamie@example.test" }],
+  "orders": [
+    {
+      "id": "O-700",
+      "customerId": "C-700",
+      "currency": "USD",
+      "paymentStatus": "paid",
+      "refundWindow": { "startsAt": "2026-10-02T12:00:00Z", "days": 30 },
+      "exclusions": [],
+      "notes": "Refunded in full on 2026-10-09."
+    }
+  ],
+  "payments": [
+    { "id": "P-700", "orderId": "O-700", "destination": "card-ending-5555", "currency": "USD", "paidMinor": 2200, "refundedMinor": 2200 }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "id": "refund-ineligible",
+  "version": 1,
+  "title": "Refund request outside the refund window",
+  "description": "A paid order whose 30-day refund window closed before the request. The gate refuses a refund, and the agent records a no-refund resolution.",
+  "suggestedGoal": "Please refund order O-400; I changed my mind about the lamp.",
+  "syntheticNow": "2026-10-13T12:00:00Z",
+  "scope": { "customerIds": ["C-400"], "orderIds": [] },
+  "customers": [{ "id": "C-400", "displayName": "Casey Stand-In", "email": "casey@example.test" }],
+  "orders": [
+    {
+      "id": "O-400",
+      "customerId": "C-400",
+      "currency": "USD",
+      "paymentStatus": "paid",
+      "refundWindow": { "startsAt": "2026-08-01T12:00:00Z", "days": 30 },
+      "exclusions": [],
+      "notes": "Desk lamp."
+    }
+  ],
+  "payments": [
+    { "id": "P-400", "orderId": "O-400", "destination": "card-ending-2222", "currency": "USD", "paidMinor": 4000, "refundedMinor": 0 }
+  ]
+}

@@ -3,11 +3,25 @@
   "version": 1,
   "title": "Eligible refund above the approval threshold",
   "description": "The worked example from the guide: a 12000 minor-unit USD order eligible for refund, which requires approval. A second customer exists in the same storefront but is outside the caller's scope.",
+  "suggestedGoal": "The standing desk motor on order O-100 failed after a week. Please refund the order.",
   "syntheticNow": "2026-10-13T12:00:00Z",
-  "scope": { "customerIds": ["C-100"], "orderIds": [] },
+  "scope": {
+    "customerIds": [
+      "C-100"
+    ],
+    "orderIds": []
+  },
   "customers": [
-    { "id": "C-100", "displayName": "Avery Example", "email": "avery@example.test" },
-    { "id": "C-200", "displayName": "Jordan Sample", "email": "jordan@example.test" }
+    {
+      "id": "C-100",
+      "displayName": "Avery Example",
+      "email": "avery@example.test"
+    },
+    {
+      "id": "C-200",
+      "displayName": "Jordan Sample",
+      "email": "jordan@example.test"
+    }
   ],
   "orders": [
     {
@@ -15,7 +29,10 @@
       "customerId": "C-100",
       "currency": "USD",
       "paymentStatus": "paid",
-      "refundWindow": { "startsAt": "2026-10-01T09:00:00Z", "days": 30 },
+      "refundWindow": {
+        "startsAt": "2026-10-01T09:00:00Z",
+        "days": 30
+      },
       "exclusions": [],
       "notes": "Customer says the standing desk motor failed after one week."
     },
@@ -24,7 +41,10 @@
       "customerId": "C-200",
       "currency": "USD",
       "paymentStatus": "paid",
-      "refundWindow": { "startsAt": "2026-10-05T09:00:00Z", "days": 30 },
+      "refundWindow": {
+        "startsAt": "2026-10-05T09:00:00Z",
+        "days": 30
+      },
       "exclusions": [],
       "notes": "No issues reported."
     }

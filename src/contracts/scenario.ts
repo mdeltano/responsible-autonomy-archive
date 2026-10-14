@@ -52,6 +52,8 @@ export const scenarioFixture = z
     version: positiveMinorUnits,
     title: boundedText(1, 120),
     description: nonEmptyNarrative,
+    // Example goal offered by the demo. Goals are untrusted text however they are written.
+    suggestedGoal: boundedText(10, 4000).optional(),
     // The synthetic "now" when an instance is created; it then advances with the injected clock.
     syntheticNow: utcTimestamp,
     scope: customerScope,
